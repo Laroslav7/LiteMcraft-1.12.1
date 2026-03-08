@@ -31,10 +31,18 @@ void Options::init() {
     m_isBobView = true;
     m_isAnaglyph3d = false;
     m_isAdvancedOpengl = false;
+#ifdef LITEMCRAFT_DESKTOP_LOWEND
+    // Low-end desktop defaults: prioritize stable 60 FPS and reduced GPU load.
+    m_fpsLimit = 1;
+    m_isFancyGraphics = false;
+    m_isEnableAo = false;
+    m_isEnableClouds = false;
+#else
     m_fpsLimit = 2;
     m_isFancyGraphics = true;
     m_isEnableAo = true;
     m_isEnableClouds = true;
+#endif
     m_skin = L"Default";
 
     m_keyForward = new KeyMapping(L"key.forward", 22);
