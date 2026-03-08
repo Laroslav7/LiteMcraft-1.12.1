@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(mcswitch CXX)
 
+option(LITEMCRAFT_DESKTOP_LOWEND "Enable desktop-friendly low-end defaults (60 FPS target + keyboard profile)." ON)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Use response files when linking objects because of the large number of source files
 set(CMAKE_CXX_USE_RESPONSE_FILE_FOR_OBJECTS ON)
@@ -14,7 +16,12 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   add_compile_options(-fdebug-prefix-map=/tmp=${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+if (MSVC AND MSVC_VERSION LESS_EQUAL 1700)
+  # Visual Studio 2012 has limited C++11 support and cannot compile C++17 mode.
+  set(CMAKE_CXX_STANDARD 11)
+else()
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -77,20 +84,28 @@ target_include_directories(mcswitch PUBLIC lib)
 
 target_compile_definitions(mcswitch PRIVATE NON_MATCHING)
 target_compile_definitions(mcswitch PRIVATE MATCHING_HACK)
-target_compile_options(mcswitch PRIVATE -fno-exceptions)
-target_compile_options(mcswitch PRIVATE -fno-strict-aliasing)
-target_compile_options(mcswitch PRIVATE -fsigned-char)
-target_compile_options(mcswitch PRIVATE -Wall -Wextra -Wdeprecated)
-target_compile_options(mcswitch PRIVATE -Wextra-semi)
-target_compile_options(mcswitch PRIVATE -fno-inline -fno-inline-functions)
-target_compile_options(mcswitch PRIVATE -fno-builtin)
+if (LITEMCRAFT_DESKTOP_LOWEND)
+  target_compile_definitions(mcswitch PRIVATE LITEMCRAFT_DESKTOP_LOWEND=1)
+endif()
 
-# Disable some warnings that are unavoidable
-target_compile_options(mcswitch PRIVATE -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-variable)
-target_compile_options(mcswitch PRIVATE -Wno-invalid-offsetof)
-target_compile_options(mcswitch PRIVATE -Wno-deprecated)
-# target_compile_options(mcswitch PRIVATE -Wno-delete-incomplete) # clangd warns about this one in MultiPlayerLevel.cpp
-target_compile_options(mcswitch PRIVATE -Wno-sign-compare)
+if (MSVC)
+  target_compile_options(mcswitch PRIVATE /W3 /EHsc /Zc:wchar_t)
+else()
+  target_compile_options(mcswitch PRIVATE -fno-exceptions)
+  target_compile_options(mcswitch PRIVATE -fno-strict-aliasing)
+  target_compile_options(mcswitch PRIVATE -fsigned-char)
+  target_compile_options(mcswitch PRIVATE -Wall -Wextra -Wdeprecated)
+  target_compile_options(mcswitch PRIVATE -Wextra-semi)
+  target_compile_options(mcswitch PRIVATE -fno-inline -fno-inline-functions)
+  target_compile_options(mcswitch PRIVATE -fno-builtin)
+
+  # Disable some warnings that are unavoidable
+  target_compile_options(mcswitch PRIVATE -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-variable)
+  target_compile_options(mcswitch PRIVATE -Wno-invalid-offsetof)
+  target_compile_options(mcswitch PRIVATE -Wno-deprecated)
+  # target_compile_options(mcswitch PRIVATE -Wno-delete-incomplete) # clangd warns about this one in MultiPlayerLevel.cpp
+  target_compile_options(mcswitch PRIVATE -Wno-sign-compare)
+endif()
 
 add_definitions(-D SAFETY_CHECKS)
 
@@ -100,13 +115,15 @@ target_link_libraries(mcswitch PRIVATE zlibstatic)
 
 add_subdirectory(lib/libpng)
 target_compile_options(libpng PRIVATE
-  -fno-inline
-  -fno-inline-functions
-  -fno-builtin
+  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-inline>
+  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-inline-functions>
+  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-fno-builtin>
 )
-target_link_options(mcswitch PRIVATE
-    "SHELL:-Wl,--whole-archive"
-    "$<TARGET_FILE:libpng>"
-    "SHELL:-Wl,--no-whole-archive"
-)
+if (NOT MSVC)
+  target_link_options(mcswitch PRIVATE
+      "SHELL:-Wl,--whole-archive"
+      "$<TARGET_FILE:libpng>"
+      "SHELL:-Wl,--no-whole-archive"
+  )
+endif()
 target_link_libraries(mcswitch PRIVATE libpng)
